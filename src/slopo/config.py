@@ -135,6 +135,10 @@ def _check_missing_space_after_colon(text: str, source: str) -> None:
 def _require_api_key(raw: dict[str, Any], source: str) -> str:
     from_env = os.environ.get("SLOPO_EMBEDDING_API_KEY")
     key = from_env or _optional_str(raw, "embedding_api_key", source)
+    # fastembed runs locally — no remote API key is needed or used.
+    model = raw.get("embedding_model", "")
+    if isinstance(model, str) and model.startswith("fastembed/"):
+        return key or "local"
     if not key:
         raise ConfigError(
             f"{source}: 'embedding_api_key' is required"
