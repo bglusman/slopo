@@ -18,6 +18,7 @@ from slopo.db import (
     ConfigurationMismatchError,
     DatabaseNotFoundError,
     SchemaVersionMismatchError,
+    adopt_source_dir,
     create_db,
     open_db,
     verify_source_dir,
@@ -108,6 +109,20 @@ def index(ctx: typer.Context) -> None:
         conn = create_db(cfg)
 
     run_index(conn, cfg, typer.echo)
+
+
+@app.command()
+def adopt(ctx: typer.Context) -> None:
+    """Adopt an existing database to the configured source_dir path."""
+    cfg = _load_config_or_exit(ctx)
+
+    if not cfg.source_dir.is_dir():
+        typer.echo(f"Error: {cfg.source_dir} is not a directory", err=True)
+        raise typer.Exit(1)
+
+    conn = _open_existing_db_or_exit(cfg)
+    previous = adopt_source_dir(conn, cfg.source_dir)
+    typer.echo(f"source_dir: {previous!r} -> {str(cfg.source_dir.resolve())!r}")
 
 
 @app.command()

@@ -60,6 +60,15 @@ def verify_source_dir(conn: sqlite3.Connection, source_dir: Path) -> None:
         raise ConfigurationMismatchError("source_dir", stored[0], resolved)
 
 
+def adopt_source_dir(conn: sqlite3.Connection, source_dir: Path) -> str:
+    resolved = str(source_dir.resolve())
+    stored = conn.execute("SELECT source_dir FROM metadata WHERE id = 1").fetchone()
+    previous = stored[0]
+    conn.execute("UPDATE metadata SET source_dir = ? WHERE id = 1", (resolved,))
+    conn.commit()
+    return previous
+
+
 def chunked(ids: Sequence[int]) -> Iterator[list[int]]:
     for start in range(0, len(ids), _MAX_SQL_VARIABLES):
         yield list(ids[start : start + _MAX_SQL_VARIABLES])

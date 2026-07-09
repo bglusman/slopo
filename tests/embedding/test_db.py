@@ -102,3 +102,17 @@ def test_save_then_load_embeddings_round_trips_the_vector(conn: sqlite3.Connecti
 
     loaded = load_embeddings(conn)
     assert np.array_equal(loaded[1], np.array([1.0, 2.0, 3.0], dtype=np.float32))
+
+
+def test_save_embeddings_ignores_already_saved_hash(conn: sqlite3.Connection):
+    conn.executescript("""
+        INSERT INTO files (id, path, mtime) VALUES (1, 'File.java', 0);
+        INSERT INTO code_units (id, file_id, name, body, start_line, end_line, body_node_count, body_hash)
+            VALUES (1, 1, 'a', 'a', 1, 2, 3, 'hashA');
+    """)
+
+    save_embeddings(conn, [EmbeddedUnit(body_hash="hashA", vector=[1.0, 2.0, 3.0])])
+    save_embeddings(conn, [EmbeddedUnit(body_hash="hashA", vector=[9.0, 9.0, 9.0])])
+
+    loaded = load_embeddings(conn)
+    assert np.array_equal(loaded[1], np.array([1.0, 2.0, 3.0], dtype=np.float32))

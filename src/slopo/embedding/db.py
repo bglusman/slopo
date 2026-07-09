@@ -36,7 +36,7 @@ def load_next_batch(
 
 def save_embeddings(conn: sqlite3.Connection, embeddings: list[EmbeddedUnit]) -> None:
     conn.executemany(
-        "INSERT INTO embeddings (body_hash, embedding) VALUES (?, ?)",
+        "INSERT OR IGNORE INTO embeddings (body_hash, embedding) VALUES (?, ?)",
         [
             (e.body_hash, np.asarray(e.vector, dtype=np.float32).tobytes())
             for e in embeddings
