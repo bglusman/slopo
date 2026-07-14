@@ -4,6 +4,7 @@ from slopo.config import Config
 from slopo.embedding.db import (
     count_unembedded_units,
     load_next_batch,
+    mark_skipped_embeddings,
     save_embeddings,
 )
 from slopo.embedding.embeddings import embed_units
@@ -29,9 +30,16 @@ def run_embed(
         )
         if not batch:
             break
-        batch_embeddings = embed_units(batch, cfg)
+        result = embed_units(batch, cfg)
         with conn:
-            save_embeddings(conn, batch_embeddings)
-        embedded += len(batch)
+            save_embeddings(conn, result.embeddings)
+            mark_skipped_embeddings(
+                conn,
+                [unit.body_hash for unit in result.skipped],
+                "unsupported by local FastEmbed provider",
+            )
+        embedded += len(result.embeddings)
         log(f"Embedded {embedded}/{total} code units...")
+        if result.skipped:
+            log(f"Skipped {len(result.skipped)} unsupported code units.")
     log("Done")

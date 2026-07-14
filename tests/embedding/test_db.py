@@ -6,6 +6,7 @@ from slopo.embedding.db import (
     count_unembedded_units,
     load_embeddings,
     load_next_batch,
+    mark_skipped_embeddings,
     save_embeddings,
 )
 from slopo.embedding.models import EmbeddedUnit
@@ -36,6 +37,36 @@ def test_count_unembedded_units_counts_each_hash_once(conn: sqlite3.Connection):
     """)
 
     assert count_unembedded_units(conn) == 1
+
+
+def test_count_unembedded_units_ignores_skipped_hashes(conn: sqlite3.Connection):
+    conn.executescript("""
+        INSERT INTO files (id, path, mtime) VALUES (1, 'File.java', 0);
+        INSERT INTO code_units (id, file_id, name, body, start_line, end_line, body_node_count, body_hash)
+            VALUES (1, 1, 'a', 'a', 1, 2, 3, 'hashA');
+        INSERT INTO code_units (id, file_id, name, body, start_line, end_line, body_node_count, body_hash)
+            VALUES (2, 1, 'b', 'b', 1, 2, 3, 'hashB');
+    """)
+
+    mark_skipped_embeddings(conn, ["hashB"], "fastembed body exceeds 2000 chars")
+
+    assert count_unembedded_units(conn) == 1
+
+
+def test_load_next_batch_skips_marked_hashes(conn: sqlite3.Connection):
+    conn.executescript("""
+        INSERT INTO files (id, path, mtime) VALUES (1, 'File.java', 0);
+        INSERT INTO code_units (id, file_id, name, body, start_line, end_line, body_node_count, body_hash)
+            VALUES (1, 1, 'a', 'a', 1, 2, 3, 'hashA');
+        INSERT INTO code_units (id, file_id, name, body, start_line, end_line, body_node_count, body_hash)
+            VALUES (2, 1, 'b', 'b', 1, 2, 3, 'hashB');
+    """)
+
+    mark_skipped_embeddings(conn, ["hashB"], "fastembed body exceeds 2000 chars")
+
+    batch = load_next_batch(conn, max_items=10, max_chars=10_000)
+
+    assert [u.body_hash for u in batch] == ["hashA"]
 
 
 # --- load_next_batch ---

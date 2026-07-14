@@ -82,6 +82,13 @@ def _connect(path: Path) -> sqlite3.Connection:
 
 def _check_schema_version(conn: sqlite3.Connection) -> None:
     row = conn.execute("SELECT version FROM schema_version").fetchone()
+    if row[0] == 2 and SCHEMA_VERSION == 3:
+        conn.execute(
+            "CREATE TABLE skipped_embeddings (body_hash TEXT PRIMARY KEY, reason TEXT NOT NULL)"
+        )
+        conn.execute("UPDATE schema_version SET version = 3")
+        conn.commit()
+        row = (3,)
     if row[0] != SCHEMA_VERSION:
         raise SchemaVersionMismatchError(
             f"schema version mismatch: database is v{row[0]}, this version expects v{SCHEMA_VERSION}."

@@ -1,10 +1,10 @@
 from slopo.config import Config
-from slopo.embedding.models import UnembeddedUnit, EmbeddedUnit
+from slopo.embedding.models import EmbeddingResult, EmbeddedUnit, UnembeddedUnit
 
 _fastembed_cache: dict = {}
 
 
-def embed_units(batch: list[UnembeddedUnit], config: Config) -> list[EmbeddedUnit]:
+def embed_units(batch: list[UnembeddedUnit], config: Config) -> EmbeddingResult:
     model_name = config.embedding_model
 
     # fastembed runs locally; LiteLLM 1.x doesn't route this prefix natively.
@@ -19,23 +19,37 @@ def embed_units(batch: list[UnembeddedUnit], config: Config) -> list[EmbeddedUni
         dimensions=config.embedding_dimensions,
         api_key=config.embedding_api_key,
     )
-    return [
-        EmbeddedUnit(body_hash=unit.body_hash, vector=item["embedding"])
-        for unit, item in zip(batch, response.data)
-    ]
+    return EmbeddingResult(
+        embeddings=[
+            EmbeddedUnit(body_hash=unit.body_hash, vector=item["embedding"])
+            for unit, item in zip(batch, response.data)
+        ],
+        skipped=[],
+    )
+
+
+_FASTEMBED_CHAR_LIMIT = 2000
 
 
 def _embed_fastembed(
     batch: list[UnembeddedUnit], model_name: str, config: Config
-) -> list[EmbeddedUnit]:
+) -> EmbeddingResult:
     from fastembed import TextEmbedding  # type: ignore[import-untyped]
+
+    safe = [unit for unit in batch if len(unit.body) <= _FASTEMBED_CHAR_LIMIT]
+    skipped = [unit for unit in batch if len(unit.body) > _FASTEMBED_CHAR_LIMIT]
+    if not safe:
+        return EmbeddingResult(embeddings=[], skipped=skipped)
 
     if model_name not in _fastembed_cache:
         _fastembed_cache[model_name] = TextEmbedding(model_name)
     model = _fastembed_cache[model_name]
 
-    vectors = list(model.embed([u.body for u in batch]))
-    return [
-        EmbeddedUnit(body_hash=unit.body_hash, vector=list(map(float, vec)))
-        for unit, vec in zip(batch, vectors)
-    ]
+    vectors = list(model.embed([unit.body for unit in safe]))
+    return EmbeddingResult(
+        embeddings=[
+            EmbeddedUnit(body_hash=unit.body_hash, vector=list(map(float, vec)))
+            for unit, vec in zip(safe, vectors)
+        ],
+        skipped=skipped,
+    )

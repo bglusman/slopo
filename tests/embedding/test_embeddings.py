@@ -36,7 +36,8 @@ def test_single_unit_mapped():
     ):
         result = embed_units(units, _CONFIG)
 
-    assert result == [EmbeddedUnit(body_hash="h7", vector=[1.0, 2.0, 3.0])]
+    assert result.embeddings == [EmbeddedUnit(body_hash="h7", vector=[1.0, 2.0, 3.0])]
+    assert result.skipped == []
 
 
 def test_multiple_units_preserve_order():
@@ -53,8 +54,9 @@ def test_multiple_units_preserve_order():
     ):
         result = embed_units(units, _CONFIG)
 
-    assert result == [
+    assert result.embeddings == [
         EmbeddedUnit(body_hash="h1", vector=[1.0, 0.0, 0.0]),
         EmbeddedUnit(body_hash="h2", vector=[0.0, 1.0, 0.0]),
         EmbeddedUnit(body_hash="h3", vector=[0.0, 0.0, 1.0]),
     ]
+    assert result.skipped == []
