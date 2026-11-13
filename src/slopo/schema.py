@@ -1,6 +1,6 @@
 import sqlite3
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 # Bump SCHEMA_VERSION whenever schema changes
@@ -39,6 +39,13 @@ def create_schema(conn: sqlite3.Connection) -> None:
         CREATE TABLE embeddings (
             body_hash  TEXT PRIMARY KEY,
             embedding  BLOB NOT NULL
+        );
+
+        -- NOT NULL is spelled out: SQLite lets a NULL into a TEXT PRIMARY KEY, and one NULL
+        -- makes `body_hash NOT IN (SELECT body_hash FROM skipped_embeddings)` match nothing.
+        CREATE TABLE skipped_embeddings (
+            body_hash  TEXT NOT NULL PRIMARY KEY,
+            reason     TEXT NOT NULL
         );
     """)
     conn.execute("INSERT INTO schema_version (version) VALUES (?)", (SCHEMA_VERSION,))

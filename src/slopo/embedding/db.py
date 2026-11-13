@@ -11,6 +11,7 @@ def count_unembedded_units(conn: sqlite3.Connection) -> int:
         """
         SELECT COUNT(DISTINCT body_hash) FROM code_units
         WHERE body_hash NOT IN (SELECT body_hash FROM embeddings)
+          AND body_hash NOT IN (SELECT body_hash FROM skipped_embeddings)
         """
     ).fetchone()
     return row[0]
@@ -24,6 +25,7 @@ def load_next_batch(
         SELECT body_hash, MIN(body)
         FROM code_units
         WHERE body_hash NOT IN (SELECT body_hash FROM embeddings)
+          AND body_hash NOT IN (SELECT body_hash FROM skipped_embeddings)
         GROUP BY body_hash
         LIMIT ?
     """,
@@ -36,11 +38,22 @@ def load_next_batch(
 
 def save_embeddings(conn: sqlite3.Connection, embeddings: list[EmbeddedUnit]) -> None:
     conn.executemany(
-        "INSERT INTO embeddings (body_hash, embedding) VALUES (?, ?)",
+        "INSERT INTO embeddings (body_hash, embedding) VALUES (?, ?)"
+        " ON CONFLICT (body_hash) DO NOTHING",
         [
             (e.body_hash, np.asarray(e.vector, dtype=np.float32).tobytes())
             for e in embeddings
         ],
+    )
+
+
+def mark_skipped_embeddings(
+    conn: sqlite3.Connection, body_hashes: list[str], reason: str
+) -> None:
+    conn.executemany(
+        "INSERT INTO skipped_embeddings (body_hash, reason) VALUES (?, ?)"
+        " ON CONFLICT (body_hash) DO NOTHING",
+        [(body_hash, reason) for body_hash in body_hashes],
     )
 
 
